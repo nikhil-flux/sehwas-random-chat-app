@@ -1,0 +1,30 @@
+name: SEO bot
+
+on:
+  schedule:
+    - cron: "0 3 * * 1"   # every Monday 03:00 UTC
+  workflow_dispatch:       # "Run workflow" button in the Actions tab
+
+permissions:
+  contents: write
+
+jobs:
+  seo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Audit, refresh sitemap, ping IndexNow
+        env:
+          # Add a repository variable named SITE_URL (Settings > Secrets and variables > Actions > Variables)
+          SITE_URL: ${{ vars.SITE_URL }}
+        run: node seo/seo-bot.js --ping
+      - name: Commit changes
+        run: |
+          git config user.name "sehwas-seo-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet || git commit -m "chore(seo): refresh sitemap and report"
+          git push
