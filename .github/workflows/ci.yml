@@ -15,13 +15,15 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run seo
-  deploy:
+      - name: Build Docker image
+        run: docker build -t sehwas:ci .
+  release:
     needs: test
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - name: Trigger Render deploy
-        env:
-          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
-        run: |
-          if [ -n "$HOOK" ]; then curl -fsS "$HOOK"; else echo "No RENDER_DEPLOY_HOOK secret set; skipping (Render auto-deploy may handle it)."; fi
+      - uses: actions/checkout@v4
+      - name: Move the release branch to this commit
+        run: git push --force origin HEAD:refs/heads/release

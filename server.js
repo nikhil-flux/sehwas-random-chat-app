@@ -50,7 +50,16 @@ const reports = new Map();     // ip -> count
 const bans = new Map();        // ip -> expiry
 let roomSeq = 0;
 
-const ipOf = (s) => s.handshake.address;
+// Behind Caddy/a load balancer every socket's address is the proxy's, so bans
+// would hit everyone. With TRUST_PROXY=1 use the real client IP from Caddy.
+const TRUST_PROXY = process.env.TRUST_PROXY === '1';
+const ipOf = (s) => {
+  if (TRUST_PROXY) {
+    const xff = s.handshake.headers['x-forwarded-for'];
+    if (typeof xff === 'string' && xff) return xff.split(',')[0].trim();
+  }
+  return s.handshake.address;
+};
 const broadcastOnline = () => io.emit('online', io.engine.clientsCount);
 
 function unpair(socket, notify = true) {

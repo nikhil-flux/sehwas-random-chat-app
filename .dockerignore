@@ -1,0 +1,10 @@
+node_modules
+.git
+.github
+.env
+*.log
+test
+seo
+deploy
+README.md
+render.yaml
