@@ -2,19 +2,11 @@ services:
   app:
     build: .
     restart: unless-stopped
-    environment:
-      NODE_ENV: production
-      PORT: "3000"
-      TRUST_PROXY: "1"
-      SITE_URL: https://${SITE_HOST}
-      TURN_URL: ${TURN_URL:-}
-      TURN_USERNAME: ${TURN_USERNAME:-}
-      TURN_CREDENTIAL: ${TURN_CREDENTIAL:-}
     expose:
       - "3000"
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/healthz >/dev/null || exit 1"]
-      interval: 15s
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000',r=>process.exit(r.statusCode<500?0:1)).on('error',()=>process.exit(1))"]
+      interval: 10s
       timeout: 5s
       retries: 5
       start_period: 10s
@@ -27,7 +19,7 @@ services:
       - "443:443"
       - "443:443/udp"
     environment:
-      SITE_HOST: ${SITE_HOST}
+      SITE_HOST: ${SITE_HOST:-:80}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
