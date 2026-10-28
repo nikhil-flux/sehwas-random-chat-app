@@ -1,0 +1,5 @@
+aws_region   = "ap-south-1"
+budget_email = "ng5196340@gmail.com"
+# domain     = "chat.example.com"
+# ssh_cidr   = "203.0.113.5/32"
+# key_name   = "my-keypair"

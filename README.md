@@ -1,117 +1,134 @@
-# Sehwas
+# Random Video Chat App
 
-Free random video chat (Omegle-style). Dark UI, WebRTC video, Node.js + Socket.IO matching server, built-in SEO bot and a CI/CD pipeline. Everything runs on free tiers.
+[![CI](https://github.com/nikhil-flux/sehwas-random-chat-app/actions/workflows/ci.yml/badge.svg)](https://github.com/nikhil-flux/sehwas-random-chat-app/actions/workflows/ci.yml)
 
-## How it works
+A random video chat web app (Omegle-style) built with Node.js and Socket.IO, containerised with Docker, served over automatic HTTPS by Caddy, tested and released through GitHub Actions, and deployed to AWS with Terraform.
+
+This project is also my DevOps portfolio piece: the app is the workload, the real work is the delivery pipeline and the infrastructure around it.
+
+## Features
+
+- Random pairing of two users into a chat room
+- Live text chat (messages trimmed to 500 characters)
+- Report system: users who collect enough reports are temporarily banned by IP
+- Health check endpoint wiring so the proxy only starts once the app is healthy
+
+## Architecture
 
 ```
-Browser A  <---- video/audio (WebRTC, peer-to-peer) ---->  Browser B
-    \                                                       /
-     \--- Socket.IO (pairing, handshake, chat) --- server.js ---/
+ Browser
+    |
+    |  HTTPS (80 / 443)
+    v
++-----------+   reverse_proxy   +-----------------+
+|   Caddy   | ----------------> |  Node.js app    |
+| auto TLS  |    app:3000       |  (Socket.IO)    |
++-----------+                   +-----------------+
+        \                              /
+         \____ Docker Compose _______/
+                     |
+              AWS EC2 (Terraform)
 ```
 
-The server only pairs two waiting users and relays the WebRTC handshake and text chat. It never sees or stores video.
+## Tech Stack
 
-## Project layout
+| Area | Tools |
+|------|-------|
+| App | Node.js, Express, Socket.IO |
+| Containers | Docker, Docker Compose |
+| Reverse proxy / TLS | Caddy 2 (automatic HTTPS) |
+| CI/CD | GitHub Actions (test and release jobs) |
+| Infrastructure as Code | Terraform |
+| Cloud | AWS (EC2, Elastic IP, Security Group, optional Budget alert) |
 
-| File | Purpose |
-|---|---|
-| `server.js` | Express + Socket.IO server, matching, report/blocking |
-| `public/index.html` | Landing page, chat screen, FAQ, SEO tags |
-| `public/style.css` | Dark theme |
-| `public/app.js` | Camera, WebRTC, buttons |
-| `public/terms.html` | Terms, privacy, safety |
-| `public/sitemap.xml`, `public/robots.txt` | SEO files (`%SITE_URL%` is filled in by the server) |
-| `seo/seo-bot.js` | SEO audit, sitemap refresh, IndexNow ping |
-| `seo/config.json` | Your live site address |
-| `test/smoke.js` | Automated end-to-end check |
-| `.github/workflows/ci.yml` | Test on every push, deploy on main |
-| `.github/workflows/seo.yml` | Weekly SEO bot |
-| `.github/dependabot.yml` | Weekly dependency update pull requests |
-| `render.yaml` | Render hosting config |
+## Project Structure
 
-## Play with friends (private rooms)
+```
+.
+├── docker-compose.yml        # app + caddy services
+├── Caddyfile                 # reverse proxy config
+├── .env.example              # copy to .env
+├── .github/workflows/ci.yml  # CI pipeline
+├── terraform/                # AWS infrastructure
+│   ├── versions.tf
+│   ├── variables.tf
+│   ├── main.tf
+│   ├── outputs.tf
+│   └── terraform.tfvars.example
+└── sehwas-5.0-random-user-video-chat-main/   # application source
+```
 
-Press **Invite a friend**. The invite link (`/?r=abc123`) is copied for you. Anyone who opens it joins the same private room and is matched only with people using that link. Press **Start video chat** instead to meet random people.
+## Run Locally
 
-## Run locally
+Requirements: Docker Desktop.
 
 ```bash
-npm install
-npm start          # http://localhost:3000, open in two tabs and allow the camera
-npm test           # matching, signaling and chat checks
-npm run seo        # SEO audit and sitemap refresh
+git clone https://github.com/nikhil-flux/sehwas-random-chat-app.git
+cd sehwas-random-chat-app
+
+cp .env.example .env        # Windows PowerShell: copy .env.example .env
+docker compose up --build
 ```
 
-After the first `npm install`, commit the generated `package-lock.json`.
+Open `http://localhost`. Browsers allow camera and microphone on `localhost` without HTTPS.
 
-## Push to GitHub
+`SITE_HOST` in `.env` controls the Caddy site address:
 
-Create an empty repo named `sehwas` on github.com/new, then:
+| Value | Behaviour |
+|-------|-----------|
+| `:80` | Plain HTTP, for local testing |
+| `chat.example.com` | Caddy gets a Let's Encrypt certificate automatically |
+
+## CI/CD
+
+The workflow in `.github/workflows/ci.yml` runs on every push:
+
+1. **test**: installs dependencies and runs the tests
+2. **release**: runs after `test` succeeds
+
+## Deploy to AWS with Terraform
+
+Requirements: Terraform 1.5+, AWS CLI configured (`aws configure`).
 
 ```bash
-git init
-git add .
-git commit -m "Sehwas first version"
-git branch -M main
-git remote add origin https://github.com/YOUR-USERNAME/sehwas.git
-git push -u origin main
+cd terraform
+cp terraform.tfvars.example terraform.tfvars   # optional: set your budget email
+terraform init
+terraform validate
+terraform plan
+terraform apply
 ```
 
-## Deploy free on Render
+Terraform creates:
 
-1. render.com > sign in with GitHub > New > Web Service > pick the repo.
-2. Build `npm install`, Start `npm start`, Instance type Free.
-3. Open the service > Environment and optionally add `SITE_URL`, `TURN_URL`, `TURN_USERNAME`, `TURN_CREDENTIAL` (see `.env.example`).
+- An Ubuntu 24.04 EC2 instance (`t3.micro`, free tier eligible) with 2 GB swap for the Docker build
+- A security group for ports 80, 443 (TCP and UDP), and optionally SSH from your IP
+- An Elastic IP, so the address survives restarts
+- A cloud-init script that installs Docker, clones this repo, writes `.env`, and runs `docker compose up -d --build`
+- An optional monthly budget alert
 
-The free plan sleeps after about 15 minutes without visitors and takes up to a minute to wake.
+After `apply`, wait about 5 minutes, then open the `site_url` output. With no domain set, the site uses a free `<ip>.sslip.io` name and Caddy gets real HTTPS for it.
 
-## Updating the site (CI/CD pipeline)
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `aws_region` | AWS region | `ap-south-1` |
+| `instance_type` | EC2 size | `t3.micro` |
+| `domain` | Your own domain (empty uses sslip.io) | `""` |
+| `ssh_cidr` | Your IP for SSH, e.g. `203.0.113.5/32` | `""` (SSH off) |
+| `budget_email` | Email for a $5/month cost alert | `""` (skipped) |
 
-Day to day you only do this:
+Tear everything down when finished:
 
 ```bash
-git add .
-git commit -m "Describe your change"
-git push
+terraform destroy
 ```
 
-Then GitHub Actions (`.github/workflows/ci.yml`) does the rest:
+## Notes and Limitations
 
-1. **Test** job installs dependencies and runs `npm test` and the SEO audit.
-2. **Deploy** job runs only on `main` and only if tests pass. It calls your Render deploy hook.
+- Video calls may fail between users on strict NATs (mobile data, some campus Wi-Fi) because no TURN server is configured.
+- Behind a reverse proxy, client IPs must be read from the `X-Forwarded-For` header for the report and ban feature to work per user.
+- Never commit `.env`, `terraform.tfvars`, or `*.tfstate`.
 
-To enable the deploy job: Render > your service > Settings > Deploy Hook > copy the URL, then GitHub > repo > Settings > Secrets and variables > Actions > New repository secret named `RENDER_DEPLOY_HOOK`.
+## Author
 
-Simpler alternative: leave the secret out and in Render set Auto-Deploy to "After CI Checks Pass". Use one or the other, not both, or every push deploys twice.
-
-Dependabot opens a pull request each week when a dependency has an update. If CI is green, merge it.
-
-Work safely with branches:
-
-```bash
-git checkout -b my-change
-# edit files, then
-git add . && git commit -m "My change" && git push -u origin my-change
-```
-
-Open a pull request on GitHub. CI tests it, then you merge it into `main` to go live.
-
-## SEO
-
-1. Put your live address in `seo/config.json` and add a GitHub repository variable `SITE_URL` (Settings > Secrets and variables > Actions > Variables).
-2. Add the site to Google Search Console, verify it, submit `/sitemap.xml`, and use URL inspection > Request indexing on the home page.
-3. `.github/workflows/seo.yml` audits pages, refreshes the sitemap and pings IndexNow (Bing, Yandex) every Monday. Google ignores IndexNow.
-
-Indexing takes days to weeks and no ranking is guaranteed.
-
-## Safety
-
-18+ gate, Report button with automatic one-hour blocking after 3 reports, no video stored, Terms page. Edit the contact line in `public/terms.html` before launch. Blocks are by IP and are kept in memory, so they reset when the server restarts. Consider adding moderation as you grow and check the laws where you live.
-
-## Troubleshooting
-
-- **Camera does not start:** allow it in the browser address bar. It needs `localhost` or HTTPS.
-- **Black remote video for some users:** add a TURN server (see `.env.example`).
-- **First load is slow on Render:** the free plan was asleep.
-- **CI fails on `npm ci`:** commit `package-lock.json` after running `npm install` once.
+Nikhil, [@nikhil-flux](https://github.com/nikhil-flux)
