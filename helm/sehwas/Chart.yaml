@@ -1,0 +1,13 @@
+apiVersion: v2
+name: sehwas
+description: Helm chart for Sehwas, a random video chat app (Node.js, Express, Socket.IO, WebRTC)
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - webrtc
+  - socket.io
+  - nodejs
+home: https://github.com/nikhil-flux/sehwas-random-chat-app
+maintainers:
+  - name: nikhil-flux

@@ -45,17 +45,16 @@ This project is also my DevOps portfolio piece: the app is the workload, the rea
 
 ```
 .
+├── server.js, public/        # application source (Express + Socket.IO)
+├── Dockerfile                # production image
 ├── docker-compose.yml        # app + caddy services
 ├── Caddyfile                 # reverse proxy config
 ├── .env.example              # copy to .env
-├── .github/workflows/ci.yml  # CI pipeline
+├── .github/workflows/        # CI (test, helm lint, image publish, release)
+├── helm/sehwas/              # Helm chart (values-dev.yaml, values-prod.yaml)
+├── argocd/                   # ArgoCD AppProject + dev and prod Applications
 ├── terraform/                # AWS infrastructure
-│   ├── versions.tf
-│   ├── variables.tf
-│   ├── main.tf
-│   ├── outputs.tf
-│   └── terraform.tfvars.example
-└── sehwas-5.0-random-user-video-chat-main/   # application source
+└── deploy/                   # EC2 helper scripts
 ```
 
 ## Run Locally
@@ -81,10 +80,43 @@ Open `http://localhost`. Browsers allow camera and microphone on `localhost` wit
 
 ## CI/CD
 
-The workflow in `.github/workflows/ci.yml` runs on every push:
+The workflow in `.github/workflows/ci.yml` runs on every push and pull request:
 
-1. **test**: installs dependencies and runs the tests
-2. **release**: runs after `test` succeeds
+1. **test**: installs dependencies, runs the tests and SEO check, builds the Docker image
+2. **helm**: lints the chart and renders it with the dev and prod values
+3. **publish** (main only): pushes the image to GitHub Container Registry as `sha-<commit>` and `latest`
+4. **release** (main only): moves the `release` branch to the tested commit
+
+## GitOps with ArgoCD and Helm
+
+Git is the source of truth for what runs in the cluster. ArgoCD watches this repo and keeps the cluster matching it.
+
+```mermaid
+flowchart LR
+    Dev[Developer] -->|git push| Repo[GitHub repo<br/>Helm chart + values]
+    Repo -->|CI: test, lint, publish| GHCR[(GHCR image)]
+    Repo -->|watches| Argo[ArgoCD]
+    Argo -->|sync| K8s[Kubernetes]
+    GHCR -->|pulled by| K8s
+    K8s -.->|drift reverted| Argo
+```
+
+| Environment | ArgoCD Application | Git revision | Values |
+|-------------|--------------------|--------------|--------|
+| dev | `argocd/application-dev.yaml` | `main` | `values-dev.yaml` |
+| prod | `argocd/application-prod.yaml` | `release` | `values-prod.yaml` |
+
+Set up (needs a cluster with ArgoCD and an ingress controller installed):
+
+```bash
+kubectl apply -f argocd/project.yaml
+kubectl apply -f argocd/application-dev.yaml
+kubectl apply -f argocd/application-prod.yaml
+```
+
+Deploy a change by merging to `main`. Roll back by reverting the commit. Edit the host in `helm/sehwas/values-prod.yaml` before using prod.
+
+The app keeps matchmaking state in memory, so the chart runs a single replica. Scaling out needs shared state first (for example Redis with the Socket.IO Redis adapter).
 
 ## Deploy to AWS with Terraform
 

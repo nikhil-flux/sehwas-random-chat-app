@@ -1,0 +1,15 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: sehwas
+  namespace: argocd
+spec:
+  description: Sehwas random video chat
+  sourceRepos:
+    - https://github.com/nikhil-flux/sehwas-random-chat-app.git
+  destinations:
+    - namespace: sehwas-dev
+      server: https://kubernetes.default.svc
+    - namespace: sehwas-prod
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist: []
