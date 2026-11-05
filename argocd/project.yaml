@@ -12,4 +12,6 @@ spec:
       server: https://kubernetes.default.svc
     - namespace: sehwas-prod
       server: https://kubernetes.default.svc
-  clusterResourceWhitelist: []
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
