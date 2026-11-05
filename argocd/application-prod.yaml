@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sehwas-prod
+  namespace: argocd
+spec:
+  project: sehwas
+  source:
+    repoURL: https://github.com/nikhil-flux/sehwas-random-chat-app.git
+    # Prod follows the release branch, which CI moves only after tests pass.
+    targetRevision: release
+    path: helm/sehwas
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-prod.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: sehwas-prod
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

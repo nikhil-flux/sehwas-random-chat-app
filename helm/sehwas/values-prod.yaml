@@ -1,0 +1,27 @@
+# Pin an immutable image tag here. CI publishes sha-<short-commit> tags, so a
+# deploy (or a rollback) is just a commit that changes this line.
+image:
+  tag: latest
+
+ingress:
+  enabled: true
+  host: chat.example.com
+  tls:
+    enabled: true
+    secretName: sehwas-tls
+  annotations:
+    # WebSocket connections stay open, so keep the proxy from closing them early.
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+
+env:
+  TRUST_PROXY: "1"
+  SITE_URL: "https://chat.example.com"
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi

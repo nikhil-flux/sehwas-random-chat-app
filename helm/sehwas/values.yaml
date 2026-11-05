@@ -1,0 +1,71 @@
+# Default values for the sehwas chart. Environment files (values-dev.yaml,
+# values-prod.yaml) override only what differs.
+
+# The app keeps matchmaking state (waiting users, rooms, bans) in process memory,
+# so more than one replica would split users into separate pools. Keep this at 1
+# until that state moves to something shared (for example Redis + the Socket.IO
+# Redis adapter).
+replicaCount: 1
+
+image:
+  repository: ghcr.io/nikhil-flux/sehwas-random-chat-app
+  # Pin to an immutable tag (for example sha-1a2b3c4) in the environment files.
+  tag: latest
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 3000
+
+ingress:
+  enabled: false
+  className: nginx
+  host: sehwas.local
+  tls:
+    enabled: false
+    secretName: sehwas-tls
+  annotations: {}
+
+# Plain environment variables passed to the container.
+env:
+  # Read the real client IP from X-Forwarded-For so report/ban works per user.
+  TRUST_PROXY: "1"
+  # SITE_URL: "https://chat.example.com"
+
+# Optional TURN server so video works on strict NATs. Stored in a Secret.
+turn:
+  enabled: false
+  url: ""
+  username: ""
+  credential: ""
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 250m
+    memory: 192Mi
+
+probes:
+  path: /healthz
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
