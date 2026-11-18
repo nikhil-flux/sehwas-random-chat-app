@@ -50,6 +50,12 @@ const reports = new Map();     // ip -> count
 const bans = new Map();        // ip -> expiry
 let roomSeq = 0;
 
+// Purge expired bans so the map doesn't grow forever
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, until] of bans) if (until <= now) bans.delete(ip);
+}, 10 * 60 * 1000).unref();
+
 // Behind Caddy/a load balancer every socket's address is the proxy's, so bans
 // would hit everyone. With TRUST_PROXY=1 use the real client IP from Caddy.
 const TRUST_PROXY = process.env.TRUST_PROXY === '1';
