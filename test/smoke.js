@@ -13,7 +13,7 @@ const fail = (m) => { console.error('FAIL:', m); server.kill(); process.exit(1);
 const ok = (m) => console.log('ok  -', m);
 
 (async () => {
-  await sleep(800);
+  await sleep(3000);
 
   let r = await fetch(URL + '/');
   let t = await r.text();
